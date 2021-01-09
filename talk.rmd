@@ -1,0 +1,1689 @@
+---
+title: "Clinical Trials - Power and Statistical Analysis Plans"
+author: "Joshua F. Wiley -- E: joshua.wiley@monash.edu W: http://bml.science"
+date: "Last Updated: `r Sys.Date()`"
+output: 
+  tufte::tufte_html: 
+    toc: true
+    number_sections: true
+---
+
+# Housekeeping
+
+## Style
+
+This talk is formatted in a 
+[handout style](https://rstudio.github.io/tufte/)
+based on a format commonly used by 
+[Edward Tufte](https://www.edwardtufte.com/)[^SIDE].
+
+[^SIDE]: Side notes are places for additional details, information, 
+references, and links to further resources. They are not essential, but may be helpful.
+Throughout this talk, I will put suggested readings, websites, etc. in side notes next to the relevant content. I will not, in general, read or talk about side notes directly in the video.]
+
+The goal is a concise document that has all the key, 
+understandable content in a digestable format. Graphs are embedded 
+where they should be in the text. Space is saved on the right hand side for 
+detailed side notes.
+
+## Format 
+
+This talk is written in `R Markdown`[^RMD]. A way of writing content in 
+`Markdown`, essentially plain text with some basic markup for headings, 
+bold/italics, etc. and special sections for `R` code used for power and 
+statistical analysis. The results are run and combined into the webpage 
+I am showing for this video. 
+
+[^RMD]: To use `R Markdown` it is helpful to know some `Markdown`.
+The [`Markdown` Guide](https://www.markdownguide.org/) is a good start.
+More information about `R Markdown` is available 
+[here](https://rmarkdown.rstudio.com/). 
+
+If you only want to follow along with the ideas and concepts, you can just 
+watch the video or read this webpage
+[http://joshuawiley.com/RCTWorkshop2021/talk.html](http://joshuawiley.com/RCTWorkshop2021/talk.html). 
+However, if you want to run the code yourself more easily, you should 
+download the raw `R` markdown code here
+[http://joshuawiley.com/RCTWorkshop2021/talk.rmd](http://joshuawiley.com/RCTWorkshop2021/talk.rmd). You will also need some of the data files if you want to follow along.
+You can get all of them from the talk GitHub repository:
+https://github.com/JWiley/RCTWorkshop2021
+
+## Tools
+
+There are three key tools that will be used in this talk.
+
+**First** is software for version control[^VCS]. 
+Version control is a way of keeping a complete edit history of 
+all changes made to files, when those changes were made, and by whom.
+This history also allows you to "undo" changes and roll back a file to 
+any previous version. Version control is very helpful for clinical trials 
+where a detailed record is valuable. I use Git and GitHub.
+
+[![GitHub](GitHub_Logo.png)](https://github.com/)
+
+[^VCS]: A good beginner's guide to using Git and GitHub for version control 
+is available [here](https://towardsdatascience.com/getting-started-with-git-and-github-6fcd0f2d4ac6). 
+If you want to become an expert, the book, "Pro Git" is freely available online as a webpage, PDF and Ebook [Pro Git webpage](https://git-scm.com/book/en/v2).
+GitHub has an [Education Program](https://education.github.com/) that allows you to get 
+an upgraded GitHub account for free. If you're in academia, its a great option.
+
+Here is an example from my group using GitHub for the planning of a 
+clinical trial: 
+[https://github.com/behavioralmedicinelab/SleepCarePlanning/]
+(https://github.com/behavioralmedicinelab/SleepCarePlanning/).
+
+*The next two tools are only needed if you want to use or follow along 
+with my examples for power analysis and statistical analysis.*
+
+**Second** a good text editor that works with `R` and `Markdown`.
+I use Emacs a very old but very flexible text editor[^EMACS].
+
+[^EMACS]: Emacs is free and open source. It works on all major 
+operating systems. Since I use it, that's what you'll see in my 
+demonstrations. Most people want to customize their Emacs with 
+additional packages. My customization is based off of one by 
+[Diego Zamboni](https://gitlab.com/zzamboni/dot-emacs).
+
+[![Emacs](emacs.png)](https://www.gnu.org/software/emacs/)
+
+Another popular option is RStudio. RStudio has a free option.
+RStudio is much newer and has a nice configuration
+"out of the box", but is less easily customized.
+
+[![RStudio](RStudio-Logo-Flat.png)](https://rstudio.com/)
+
+**Third** you will need `R` itself, which is the actual software 
+and language used for the power analyses and analysis examples.
+
+[![R](Rlogo.png)](https://www.r-project.org/)
+
+If you are new to `R` but want to learn more and have more 
+guide to getting all these tools setup on your own computer, 
+the first few weeks from my 
+[Honours Stats Class](http://joshuawiley.com/MonashHonoursStatistics/) 
+may be helpful. There are also numerous guides, classes, and books online.
+
+These are the `R` packages used for power and analysis examples. If you want to 
+try them yourself, you will need to install these first.
+Any text after the hash tag (#) is a comment / informational only.
+This code loads all the additional packages used.
+
+```{r setup}
+options(digits = 3)
+
+## to format this document
+## W: https://github.com/rstudio/tufte
+library(tufte)
+
+## great for data management
+## W: https://rdatatable.gitlab.io/data.table/
+library(data.table)
+
+## miscellaneous functions and tools I used
+## W: http://joshuawiley.com/JWileymisc/
+library(JWileymisc)
+
+## estimate marginal means, for post hoc comparisons
+## W: https://github.com/rvlenth/emmeans
+library(emmeans)
+
+## visualize results from regression models
+## W: https://pbreheny.github.io/visreg/
+library(visreg)
+
+## beautiful, flexible graphs
+## W: https://ggplot2.tidyverse.org/
+library(ggplot2)
+library(scales)
+
+## cleaner, simpler themes for ggplot2 graphs
+## W: https://rpkgs.datanovia.com/ggpubr/index.html
+library(ggpubr)
+
+## color blind friendlier color pallettes
+## W: https://github.com/sjmgarnier/viridis
+library(viridis)
+
+## generalized estimating equations GLMs
+library(geepack)
+
+## tools for parallel processing to speed up
+## Monte Carlo simulation for power analyses
+library(foreach)
+library(doParallel)
+library(doRNG)
+
+```
+
+# "Standard" Randomized Controlled Trial
+
+It is assumed that a starting point for any staff involved in any clinical trial 
+is basic Good Clinical Practice (GCP) training. If you don't have GCP training 
+yet, it is freely available from many sources, such as:
+[Society of Behavioral Medicine](https://www.sbm.org/training/good-clinical-practice-for-social-and-behavioral-research-elearning-course).
+
+First, we'll cover a fairly standard, two arm, parallel group RCT comparing sleep hygiene education to cognitive behavioral therapy for insomnia (CBT-I). There is a baseline assessment, followed by randomization in a 1:1 ratio, the intervention and a post intervention assessment that serves as the endpoint. This design is diagrammed in Figure 1.
+
+```{r, echo = FALSE, fig.cap = "Figure 1. Diagram for a standard randomized controlled trial design."}
+
+DiagrammeR::grViz("
+digraph 'Standard RCT' {
+  graph [overlap = true, fontsize = 14]
+  node [fontname = Helvetica, shape = rectangle]
+  BASE [label = 'Baseline\nAssessment']
+  POST [label = 'Post Intervention\nAssessment']
+  SHE [label = 'Sleep Hygiene']
+  CBTI [label = 'CBT-I']
+
+  node [fontname = Helvetica, shape = circle]
+  R [label = 'R\n1:1']
+
+  BASE -> R
+  R -> {SHE CBTI}
+  {SHE CBTI} -> POST
+}
+")
+
+```
+
+## Statistical Analysis Plan
+
+Once a trial design is determined, my next step is to figure out 
+a statistical analysis plan (SAP). At the stage of developing a trial proposal 
+or grant, it is not required to write an entire SAP. However, having a clear plan 
+for the core items from Section 6 (related to analysis) from the Clinical Trial SAP guidelines[^SAPREF] is good. In particular the following:
+
+*  **Outcome definitions**: including all primary and secondary outcomes, how and when they are measured, and any planned calculations or transformations.
+*  **Analysis methods**: 
+   *  What analysis method will be used (for each outcome)
+   *  Any adjustment for covariates
+   *  How assumptions will be checked
+   *  Alternate methods if assumptions do not holds
+   *  Any planned sensitivity analyses
+   *  Any planned subgroup analyses
+*  **Missing data**: expectations around and how missing data will be handled
+*  **Additional analyses**: any planned additional analyses
+*  **Harms / Adverse Events**: how adverse events will be measured, coded, and any planned analyses
+*  **Statistical software**: what specific software will be used
+
+[^SAPREF]: In 2017, detailed, consensus guidelines on SAPs were published in *JAMA*, 
+including 63 core items and an additional 17 important items but not required 
+to be listed in the SAP. **Reference**:</br>
+Gamble, C., Krishan, A., Stocken, D., Lewis, S., Juszczak, E., Doré, C., ... & Loder, E. (2017). Guidelines for the content of statistical analysis plans in clinical trials. *JAMA, 318*(23), 2337-2343. 
+[https://doi.org/10.1001/jama.2017.18556](https://doi.org/10.1001/jama.2017.18556)
+
+At the proposal/grant stage, I would not necessarily write detailed SAP sections even for these categories, but you do need at least in your head to know the answers. 
+Here is a hypothetical rough draft for our "standard" RCT[^SAPNOTE].
+
+[^SAPNOTE]: Note that for brevity, this hypothetical example is greatly simplified. Most trials quickly become far more complex.
+
+**Outcome definitions**
+
+*  The primary outcome is *Insomnia Severity Index* (ISI) assumed to be continuous and normally distributed. The primary endpoint is post intervention. No additional outcomes.
+
+**Analysis methods**
+
+*  Linear regression analysis will be used with Condition dummy coded (CBT-I = 1 and Sleep Hygiene = 0) and Condition entered as a predictor.
+*  Baseline ISI will be entered as a covariate.
+*  Assumptions will be assessed graphically via density plots and scatter plots.
+*  Linear regressions with bootstrapping will be used if normality assumptions are not met (considered low risk[^LOWNOTE]).
+*  No planned sensitivity analyses.
+*  No planned subgroup analyses.
+
+**Missing data**
+
+*  Little missing data (<5%) expected. Complete cases will be analyzed.
+
+**Additional analyses**
+
+*  No planned additional analyses.
+
+**Harms / Adverse Events**
+
+* Frequencies and percentages will be reported for all coded AEs.
+
+**Statistical software**
+
+*  The latest version of `R` at the time of analysis will be used.
+
+[^LOWNOTE]: The low risk part will be important shortly when we consider power analyses. It will be revisted in that section.
+
+This planned analysis could be diagrammed as shown in Figure 2
+[^STRATANOTE].
+
+[^STRATANOTE]: Note that we are assuming fairly simple randomization. That is,
+randomization with no strata, no clusters. There may be variable blocks to help 
+ensure balance. If stratified randomization was used, the stratification factors 
+should be included as covariates. **References**:</br>
+Kahan, B. C., & Morris, T. P. (2012). Reporting and analysis of trials using stratified randomisation in leading medical journals: review and reanalysis. *BMJ*, 345. </br>
+Kahan, B. C., & Morris, T. P. (2012). Improper analysis of trials randomised using stratified blocks or minimisation. *Statistics in Medicine, 31*(4), 328-340.
+
+```{r, echo = FALSE, fig.cap = "Figure 2. Diagram of planned analysis for a standard randomized controlled trial design."}
+
+DiagrammeR::grViz("
+digraph 'Standard RCT Analysis' {
+  graph [overlap = true, fontsize = 14]
+
+  node [fontname = Helvetica, shape = triangle]
+  INT [label = 'Intercept']
+
+  node [fontname = Helvetica, shape = rectangle]
+  POST [label = 'Post ISI\n(outcome/endpoint)']
+  Condition [label = 'Condition']
+  BASE [label = 'Baseline ISI']
+
+  BASE -> POST [label = <B<SUB>2</SUB>>]
+  Condition -> POST [label = <B<SUB>1</SUB>>]
+  INT -> POST [label = <B<SUB>0</SUB>>]
+
+  POST -> POST [dir=both, label = 'Residual\nVariance']
+}
+")
+
+```
+
+In terms of an equation, we would write our model[^BASICEQN] as:
+
+$$
+\eta = B_0 + B_1 \cdot Condition + B_2 \cdot Base_{ISI}
+$$
+
+and then from that linear equation, our assumed outcome 
+distribution[^BASICDIST]:
+
+$$
+Post_{ISI} \sim \mathcal{N}(\eta, \sigma_{ResVar})
+$$
+
+[^BASICEQN]: $\eta$ indicates the linear predicted values from: 
+the intercept ($B_0$), the regression coefficient for Condition ($B_1$), 
+which was dummy coded, so this represents the expected different in ISI 
+at post intervention for CBT-I compared to Sleep Hygiene, and the 
+slope of baseline ISI on post ISI ($B_2$), which is the stability of ISI 
+over time and serves to adjust for any baseline differences in ISI. 
+This primarily should reduce noise and therefore increase our precision of 
+estimating the treatment effect. As Condition is randomized we are not 
+controlling for baseline ISI to recover an accurate causal effect of 
+treatment per se, but to reduce noise and give a more power test.
+
+[^BASICDIST]: Here the $\mathcal{N}$ represents the assumed normal 
+distribution. This equation is read Post ISI is distributed as a 
+normal distribution with mean equal to $\eta$, our linear predicted 
+value from our regression model equation and standard deviation  
+$\sigma_{ResVar}$. This is the residual variability. The variability 
+in post ISI not explained by the model. The inclusion of baseline ISI 
+should reduce this residual variability, assuming baseline and post ISI 
+are correlated with each other.
+
+```{r, include = FALSE}
+## this code is not included in the HTML
+## you do not need to run this code, but I included it
+## so you can see how the initial sample data set for analysis
+## was created
+
+## simulate some data for basic/standard RCT
+params <- data.table(
+  N = 200L,
+  ratio = .5,
+  baseintercept = 14,
+  baseSD = 3,
+  postintercept = -1,
+  condition = -4,
+  postSD = 2,
+  stability = .5)
+
+set.seed(1234)
+basic <- data.table(
+  ID = 1L:params$N,
+  Condition = sample(rep(0:1, each = params$N * params$ratio)),
+  BaseISI = rnorm(params$N, mean = params$baseintercept, sd = params$baseSD))
+basic[, PostISI := rnorm(
+  params$N,
+  mean = params$baseintercept + params$postintercept +
+    params$condition * Condition +
+    params$stability * BaseISI,
+  sd = params$postSD)]
+
+## now give the conditions at stages 1 & 2 some nicer names
+basic[, Condition := factor(Condition, levels = 0:1,
+                            labels = c("SHE", "CBT-I"))]
+
+saveRDS(basic, file = "basic.RDS", compress = "xz")
+
+``` 
+
+Some sample data for analysis is available
+[http://joshuawiley.com/RCTWorkshop2021/basic.RDS](http://joshuawiley.com/RCTWorkshop2021/basic.RDS). We read that into `R`[^DATANOTE].
+
+[^DATANOTE]: If you want to see where these sample data come from, the 
+code used to simulate them is in the original `R Markdown` file that you 
+could download at the beginning. It is not shown for brevity.
+
+```{r}
+
+basic <- readRDS("basic.RDS")
+
+```
+
+Table 1 shows a few rows of the dataset.
+
+```{r, echo = FALSE, results = 'asis'}
+
+knitr::kable(head(basic), caption = "Table 1. The first 6 rows of the sample dataset for the 2-arm, standard RCT.")
+
+```
+
+Now we can fit our linear regression model using `lm()`.
+
+```{r}
+
+m.basic <- lm(PostISI ~ 1 + Condition + BaseISI, data = basic)
+
+```
+
+Next we visually assess the diagnostics shown in Figure 3[^DIAGFIG].
+These diagnostics look great.
+
+[^DIAGFIG]: These diagnostic figures pack in a lot of information. 
+Detailed information on what is included is available:
+[http://joshuawiley.com/JWileymisc/articles/diagnostics-vignette.html](http://joshuawiley.com/JWileymisc/articles/diagnostics-vignette.html).
+
+```{r, fig.width = 7, fig.height = 9, fig.cap = "Figure 3. Model diagnostics."}
+
+plot(modelDiagnostics(m.basic), ncol = 1, nrow = 2)
+
+```
+
+The results are in Table 2. We can see each of the regression 
+coefficients, and most importantly $B_1$, the expected, adjusted 
+difference at post intervention in ISI between CBT-I compared to 
+Sleep Hygiene[^KABLE].
+
+[^KABLE]: The use of `knitr::kable()` is purely to create a more elegantly 
+formatted table in the webpage. It is not needed.
+
+```{r, results = 'asis'}
+
+knitr::kable(APAStyler(modelTest(m.basic)),
+  caption = "Table 2. Basic linear regression model results for standard 2-arm RCT.")
+
+```
+
+We also might want the (adjusted) means in each condition at post intervention,
+which we obtain using the `emmeans()` function.
+
+```{r, results = 'asis'}
+
+em.basic <- emmeans(m.basic, ~ Condition)
+
+knitr::kable(em.basic,
+  caption = "Table 3. Adjusted means and confidence intervals by group (SHE = Sleep Hygiene Education; CBT-I = Cognitive Behavioral Therapy for Insomnia.")
+
+```
+
+### Analysis Summary
+
+With a trial design established, the next steps are to develop a statistical 
+analysis plan (SAP). Although for proposals/grants, a full SAP may not be written,
+already at the proposal stage, a plan should be in place.
+
+Best practice is to follow established clinical trial SAP guidelines:
+
+Gamble, C., Krishan, A., Stocken, D., Lewis, S., Juszczak, E., Doré, C., ... & Loder, E. (2017). Guidelines for the content of statistical analysis plans in clinical trials. *JAMA, 318*(23), 2337-2343. 
+[https://doi.org/10.1001/jama.2017.18556](https://doi.org/10.1001/jama.2017.18556)
+
+To my knowledge, there are no specific guidelines for grants, but at a minimum, when I review clinical trial grants in Australia, I look for:
+
+*  What is the primary outcome, its distribution and any calculation and what is the primary endpoint?
+*  What is the proposed analysis method for the primary outcome and endpoint and is this appropriate. Common issues surround covariates, failing to adjust for stratification factors, and assumptions I find implausible and that are not justified (e.g., that self-reported sleep efficiency will be normally distributed in a healthy sample).
+*  How much and what type of missing data are expected and how will these be addressed. For simplicity in this talk, I used complete case analysis. In practice, unless I can be convinced that rates of missing data are likely to be very low (e.g., 5% or less), this is not optimal. Last observation carried forward also is not appropriate. Better methods including estimating-equation methods and statistical models (e.g., full information maximum likelihood, multiple imputation). The highest marks go to proposals that outline both a strong approach to addressing missing data and have planned sensitivity analyses to further explore the sensitivity of results to assumptions about missingness[^MISSREF].
+
+[^MISSREF]: References for missing data are:</br>
+Little, R. J., D'Agostino, R., Cohen, M. L., Dickersin, K., Emerson, S. S., Farrar, J. T., ... & Stern, H. (2012). The prevention and treatment of missing data in clinical trials. *New England Journal of Medicine, 367*(14), 1355-1360.</br>
+Enders, C. K. (2010). *Applied missing data analysis*. Guilford press. (this is a book)</br>
+Little, T. D., Lang, K. M., Wu, W., & Rhemtulla, M. (2016). Missing data. *Developmental psychopathology*, 1-37.</br>
+
+A very nice Statistical Analysis Plan for a large trial in sleep is from the 
+SAVE study. The SAP can be accessed here:
+https://journals.sagepub.com/doi/suppl/10.1177/1747493015607504/suppl_file/SAVE_SAP_v1_10July2015.pdf
+
+Finally, there are no specific references for further reading on clinical trial statistics because the statistics used and required vary greatly. For example, they will differ by the assumed (or not) distribution of the outcome, whether the endpoint is a single time point or change over time, whether there is any clustering, and many more factors. If you are not confident that you are choosing a reasonable or the best approach, I would encourage consulting a quantitative expert.
+
+## Power Analysis
+
+With a statistical analysis plan in place, even if not fully written, it is 
+much easier to conduct an appropriate power analysis.
+
+The first step is to identify for which analyses you intend to power the trial. 
+Some possible (not exhaustive) choices are:
+
+*  Primary analysis for the primary outcome at the primary endpoint
+*  Sensitivity analyses for the primary outcome at the primary endpoint
+*  Analyses for secondary outcome(s)
+*  Analyses for primary outcome at the primary endpoint, if assumptions are not met, if missing data are high, etc.
+
+What should be clear here is that for all but the simplest clinical trials, 
+there is not "a" power analysis. Rather, there are *power analyses*, 
+emphasis on the plural. Investigators often restrict powering the study to 
+the primary analysis of the primary outcome at the primary endpoint, but not always.
+
+There are many tools and approaches to power analysis. A common proposal/grant 
+approach I see goes like this (or would if people were overly honest):
+
+We are going to do some fancy analysis. We based our power analysis off some different, 
+crude approximation that may be related.
+
+In practice this may look like:
+
+"Planned analyses are linear mixed models. Power was based off of Cohen's d at
+post test, which should be conservative."
+
+Most of us are guilty of doing this. I am guilty of this. However, this workshop 
+is about being better. Clinical trials the strong way.
+
+There are many rules of thumb, pre-built software, approximate equations, look up 
+tables, and more for doing power analysis. There is a problem, however. There are 
+many different statistical models that can be used for an analysis and you would 
+need separate equations / software / approaches to calculate power for each. Easy 
+tools that cover the myriad possibilities simply do not exist. So you see the 
+crude approximations I mentioned above. 
+
+**What is the alternative?  Is there a unified, better way?**
+
+Yes! There is a general approach that is better. 
+Monte Carlo studies / simulations[^MONTECARLO] 
+can be used to provide accurate power analyses for basically any statistical 
+analysis plan. The "catch" is that it takes time and work.
+
+[^MONTECARLO]: Monte Carlo studies have many other uses and benefits 
+beyond "just" power analysis. A Monte Carlo study simulates many datasets 
+and then each of these can be analyzed. Because we generated the synthetic 
+datasets, we know the "true" values used to generate them. Thus, a Monte Carlo 
+study can be used to evaluate whether a planned analysis will yield unbiased 
+results. For this reason Monte Carlo studies are common in applied methods 
+journals. Also, as long as you can calculate a quantity, you can study it. 
+For example, it would be straightforward to modify a Monte Carlo study to indicate 
+what sample size is needed for a confidence interval on a transformed variable to 
+have a width of < 1. That is, you could determine what sample size is needed 
+for a specific degree of precision. You could evaluate what sample size is required
+to have less than 10% relative bias (e.g., some complex models are known to only 
+work well for large samples but what is "large enough" depends on context). 
+Despite their effort, Monte Carlo studies open a wealth of possibilities to 
+ensure that a planned trial and analyses are appropriate and have the best chance of 
+yielding trustworthy, actionable results.
+
+Here I am going to show you the basics of a Monte Carlo study to power our standard, 
+2-arm RCT that we already developed the SAP. Monte Carlo studies or Monte Carlo 
+simulations involve repeated random sampling to generate a range of plausible 
+scenarios, and then analyzing these random data and synthesizing the results. 
+In our case, we are analyzing and synthesizing results to determine the sample 
+size needed for our clinical trial.
+
+To start off our Monte Carlo study, we must have a crystal clear idea of what our 
+statistical analysis is. We will start with the analysis diagram for our primary 
+statistical analysis, but with a few additions. This is shown in Figure 4.
+Because we assume that missing data will be minimal and plan a complete case analysis, 
+we will not explicitly incorporate missing data nor any missing data mechansisms into 
+this figure. If missing data were expected, they would need to be added.
+
+```{r, echo = FALSE, fig.cap = "Figure 4. Diagram of model for power analysis a standard randomized controlled trial design."}
+
+DiagrammeR::grViz("
+digraph 'Standard RCT Analysis' {
+  graph [overlap = true, fontsize = 14]
+
+  node [fontname = Helvetica, shape = triangle]
+  INT [label = 'Intercept']
+
+  node [fontname = Helvetica, shape = rectangle]
+  POST [label = 'Post ISI\n(outcome/endpoint)']
+  Condition [label = 'Condition']
+  BASE [label = 'Baseline ISI']
+
+  BASE -> POST [label = <B<SUB>2</SUB>>]
+  Condition -> POST [label = <B<SUB>1</SUB>>]
+  INT -> POST [label = <B<SUB>0</SUB>>]
+
+  POST -> POST [dir=both, label = '(Residual)\nVariance']
+
+  INT -> BASE [label = <B<SUB>BASE</SUB>>]
+  INT -> Condition [label = 'Probability']
+  BASE -> Condition [dir=both, label = 'r']
+  BASE -> BASE[dir=both, label = 'Variance']  
+}
+")
+
+```
+
+What Figure 4 shows us is the model for our primary outcome and endpoint, 
+and models to generate all the variables that feed into our primary 
+outcome. Here I am assuming:
+
+*  Baseline ISI follows a normal distribution
+*  Post intervention ISI follows a normal distribution
+*  Condition is binary (0/1)
+
+In addition, to conduct a Monte Carlo study, **we** must supply values for 
+every path in that model.
+
+*  $B_0$ the intercept of Post ISI
+*  $B_1$ the adjusted difference in Post ISI between our two conditions, in the same units of measure as our outcome.
+*  $B_2$ the slope of Post ISI on baseline ISI. Likely differs depending on time (e.g., often we assume a stronger association if the measurements were say 2 weeks apart versus 1 year apart).
+*  Post ISI residual variance: what is the standard deviation of post ISI that our model cannot explain?
+*  $r$ what is the association between baseline ISI and Condition? Because we randomize Condition, we can assume $r = 0$, which is a very reasonable assumption. However, if we had two baseline covariates that were not randomized, assuming they are perfectly uncorrelated is likely unreasonable.
+*  $B_{BASE}$ what is the mean of baseline ISI (i.e., its intercept)?
+*  Baseline ISI variance: we don't have any predictors, so this is just what is the standard deviation of ISI at baseline?
+*  $Probability$ what is the probability of $Condition = 1$. Since we know our allocation ratio is 1:1, we can fix this at $Probability = 0.50$, and again this is fixed and reasonable.
+
+Other than the probability of being in each condition and the association between 
+Condition and Baseline ISI, there are no clear choices what to pick for every parameter. 
+These parameters are all very easy to estimate if data are available, but without data, 
+it is challenging to derive each of these from the literature.
+
+Here is an example of how that process may look. I work in cancer, so will use that as an example.
+
+Suppose our intervention is for people right after colon cancer diagnosis and runs for one month.
+
+First, I would look into the general literature to find observational studies reporting 
+ISI in people with colon cancer near diagnosis. From these I can likely get the mean
+and standard deviation of ISI which I would use for $B_{BASE}$ and baseline ISI variance.
+
+Second, I would look for any longitudinal studies to try to estimate what the stability 
+of ISI over time (one month ideally) is. If I could find studies that started at 
+colon cancer diagnosis and had one month follow-up, that is perfect. If not, try to 
+find some different studies, perhaps an 8 and 12 week follow up and see how different 
+the results are to get a sense of whether the stability of ISI in colon cancer varies 
+a lot or is relatively stable. Even if I can find something, it is likely reported 
+as a correlation, which would need to be converted to an unstandardized regression slope.
+
+Third, I would consider what change in ISI I would expect in the control condition: 
+Sleep Hygiene. This may be a combination of any true Sleep Hygiene effects + natural 
+change over time. I would inform this based on any observational longitudinal studies 
+of ISI in colon cancer to inform what naturalistic change may be expected + any 
+intervention studies on Sleep Hygiene.
+
+Fourth, I would consider what difference I expect or wish to have adequate power to 
+identify between Sleep Hygiene and CBT-I. This may be based on previous trials of 
+CBT-I, minimally important differences on the ISI, etc. This would be in ISI units. 
+For example, I may say that a 4-point change in ISI is the smallest effect I am 
+interested in being able to detect. Note that this is not a standardized effect 
+size. Many people lean on standardized effect sizes for power analysis as they 
+simplify life. However, standardized effects are typically a ratio of the absolute, 
+raw effect to the amount of variability. Clinically, would I care less about a 
+4 point decline in ISI if the between person standard deviation of post ISI was 
+6 than if it was 2? The standardized effect size would be very different due to 
+variability between people, but the absolute intervention effect the same.
+
+Fifth, I would try to estimate the residual variance in ISI at post intervention. 
+Unless I am expecting a very large intervention effect or a lot of change over 
+time, one way to start is to assume that post ISI standard deviation will be 
+similar to baseline. However, the residual will be smaller because a lot of 
+variance should be explained by baseline ISI. 
+
+
+At this point, estimates exist for all the parameters needed. The last 
+step I would take is to consider where I may be wrong. For example, am I very 
+confident in the slope of post ISI on baseline ISI or is that based on limited or 
+poor data? For example, if I had to use data from a study of 20 men with prostate cancer,
+rather than a large sample of people with colon cancer, I would be less confident that 
+my estimate is the "truth" or even a good approximation. If I am not confident in an 
+estimate for a specific parameter, then I would try to choose a range of values that 
+I believe cover the plausible spread.
+
+Once we have parameter estimates, we can fairly easily code a Monte Carlo 
+simulation study. Conceptually, here are the steps. For every set of parameters:
+
+*  Generate K simulated datasets with N participants
+*  On each K dataset, conduct the planned analysis and record the p-value for the 
+   condition effect
+*  Calculate the proportion (mean) of p-values less than $alpha$, often $p < .05$ across all K datasets. This is the empirical power for N participants and that set of parameters.
+
+By varying the number of participants, we can identify how many participants are 
+needed to obtain a specific power level. Monte Carlo studies involve random samples. 
+Therefore,  you may get slightly different results from one time to the next.
+To minimize this, you can increase the number of random samples (datasets) generated 
+for each combination of parameters and sample size, N. However, this also requires 
+more computer time, which may or may not be an issue.
+
+In the code, I made the following choices:
+
+*  Vary sample size from 100 to 500 by 20. 
+*  Probability for condition is .5
+*  Mean ISI ($B_{BASE}$) is 14
+*  Standard deviation of ISI at baseline is 5
+*  The post ISI intercept (in Sleep Hygiene) is either -1 or -2
+*  The adjusted difference between Sleep Hygiene and CBT-I at post is 
+   -4, -3, or -2.
+*  The post ISI residual standard deviation is 4
+*  The regression slope for post ISI on baseline ISI is 0.5.
+
+Next, all possible combinations of these parameters are created: 126 different 
+combinations in total. Then we have to decide for each combination, how many random 
+datasets do we want to generate?  The more we generate, the more reliable the results,
+but also the more time consuming computationally. Here I chose 200. 
+That means 200 datasets are generated for each of 126 different combinations,
+(25,200 datasets in total), linear regression models are run on each, and the p-values 
+extracted and stored.
+
+This next part is heavy on `R` code. If you only care about it conceptually, 
+feel free to skip this part of the webpage and of the video.
+
+```{r}
+
+## Monte Carlo Simulation Code for Standard 2-Arm RCT
+params <- as.data.table(expand.grid(
+  N = seq(from = 100, to = 500, by = 20), ## 
+  probability = .5,
+  bbase = 14,
+  baseSD = 5,
+  b0 = c(-1, -2),
+  b1 = c(-4, -3, -2),
+  postSD = 4,
+  b2 = c(.5)))
+
+## view the first 6 rows of the parameter dataset
+head(params)
+
+## decide how many replicates for each condition, we do 200
+params <- do.call(rbind, rep(list(params), 200))
+params[, run := 1L:nrow(params)]
+
+
+## I've already run and saved this so set to FALSE
+## would change to TRUE to re-run the Monte Carlo study
+if (FALSE) {
+## create a local cluster using 24 cores
+## if your computer does not have 24 or more cores
+## set this number to the number of cores you have
+cl <- makeCluster(24L)
+
+## load packages on the cluster
+invisible(clusterEvalQ(cl, {
+  library(data.table)
+  library(emmeans)
+}))
+
+## export the parameter list
+clusterExport(cl, "params")
+
+registerDoParallel(cl)
+
+set.seed(1234)
+basicMonteCarloResults <- do.call(rbind, foreach(i = 1:nrow(params), .combine = c) %dorng% {
+basicsim <- data.table(
+  Condition = sample(rep(0:1, each = params$N[i] * params$probability[i])),
+  BaseISI = rnorm(params$N[i], mean = params$bbase[i], sd = params$baseSD[i]))
+basicsim[, PostISI := rnorm(
+  params$N[i],
+  mean = params$b0[i] +
+    params$b1[i] * Condition +
+    params$b2[i] * BaseISI,
+  sd = params$postSD[i])]
+
+## now give the conditions at stages 1 & 2 some nicer names
+basicsim[, Condition := factor(Condition, levels = 0:1,
+                           labels = c("SHE", "CBT-I"))]
+
+msim.basic <- lm(PostISI ~ 1 + Condition + BaseISI, data = basicsim)
+
+
+list(data.table(
+  run = i,
+  Pvalue = coef(summary(msim.basic))[2, "Pr(>|t|)"]))
+})
+
+## merge param list and results
+basicMonteCarloResults <- merge(params,
+                          basicMonteCarloResults,
+                          by = "run")
+
+## save the results for future use without re-running
+saveRDS(basicMonteCarloResults,
+        file = "basicMonteCarloResults_power.RDS",
+        compress = "xz")
+
+## shut the cluster down
+stopCluster(cl)
+rm(cl)  
+}
+
+``` 
+
+Although I show the code, I saved the results from the Monte Carlo study itself so 
+you can read the results in without re-running it. In terms of time, on my system,
+it took about 30 seconds to run. That is with 24 CPU cores. Its roughly linear scaling,
+so if you ran it on 1 CPU core, it would take ~ 24x as long or around 12 minutes.
+
+Now we can graph the results, which are in Figure 5. The y axis is the power. The 
+x axis is the number of people. Different line types and colours represent Condition 
+effects of -4, -3, or -2, favoring CBT-I. Different panels represent -2 or -1 for 
+the post ISI intercept. Visually, it appears that power is relatively insensitive to this.
+Power for the Condition effect depends primarily on the condition effect, here, and 
+sample size. A vertical line was added at 140 participants (70 each arm), which shows 
+that under all conditions explored, 140 participants would provide >80% power 
+to detect a difference between CBT-I and Sleep Hygiene.
+The key here is all conditions explored. That does not mean its a guarantee. Our results 
+only apply to those parameters and assumptions we made. 
+
+```{r, fig.width = 6, fig.height = 10, fig.cap = "Figure 5. Power Results from Monte Carlo Study for Standard RCT." }
+
+## read in the monte carlo results (can download from GitHub)
+basicMonteCarloResults <- readRDS("basicMonteCarloResults_power.RDS")
+
+ggplot(basicMonteCarloResults, aes(N, as.numeric(Pvalue < .05),
+                                   colour = factor(b1),
+                                   linetype = factor(b1))) +
+  scale_y_continuous("Power", labels = percent) +
+  geom_hline(yintercept = 0.80) +
+  geom_vline(xintercept = 140) +
+  scale_color_viridis_d() +   
+  stat_smooth(method = "loess", se = FALSE, formula = y ~ x, size = 1.5) +
+  facet_grid(b0 ~ ., scales = "free") +
+  theme_pubr()
+
+``` 
+
+### Power Summary
+
+In proposals and especially for grants, often it is not possible to present this 
+much detail. However, you can briefly describe a Monte Carlo study for power, where 
+estimates came from, etc. When I do them, I like to evaluate a range of plausible 
+conditions. This does not guarantee that any of my conditions are "true", but at 
+least all my eggs are not in one basket.  If my results showed that 140 people 
+provided sufficient power only under the most optimistic scenarios, I would be worried
+about my trial. In text, I include graphs, if possible, or briefly describe the study 
+along with something like "in 22/28 different scenarios, XXX people provided > 80% 
+power". 
+
+The challenges in Monte Carlo studies are typically (1) identifying plausible parameters 
+to use and (2) implementing the conceptual model into code. Although identifying 
+parameters takes time, I find the process is valuable and strengthens clinical trials.
+It forces either pilot data or extensive literature searches and a close familiarity and 
+explicit assumptions about what data you expect to collect during the trial. 
+These assumptions may be wrong, but they are equally present when doing 
+simpler power analyses based off of standardized effect sizes. In a Monte Carlo study, 
+you make the assumptions very explicit and are forced to grapple with those choices.
+
+Another benefit of Monte Carlo studies is that you have literally synthetic trial 
+datasets. This means that before you ever collect any real data, you have functioning 
+code to conduct your analyses. Having code for analyses forces them to be explicit.
+You cannot just say, "oh we'll have some covariates probably". You must know what those 
+are, what values you expect for them, and have them properly incorporated into 
+the analysis model. This can be part of the trial pre-registration so that 
+actual, functional analysis code is registered.
+
+One final note, if you want to use a different $alpha$ value, it is very easy to change. 
+In the graph code where it is `Pvalue < .05` you could set `Pvalue < .01` for example 
+to get $alpha = .01$.
+
+**References**
+
+Every Monte Carlo study will look different as they depend on the assumptions 
+and on the planned analysis type. However, some articles that are focused on 
+giving tutorials to this approach are listed.
+
+Muthén, L. K., & Muthén, B. O. (2002). How to use a Monte Carlo study to decide on sample size and determine power. *Structural Equation Modeling, 9*(4), 599-620. https://doi.org/10.1207/S15328007SEM0904_8
+
+Arend, M. G., & Schäfer, T. (2019). Statistical power in two-level models: A tutorial based on Monte Carlo simulation. *Psychological Methods, 24*(1), 1-19. https://doi.org/10.1037/met0000195
+
+Ma, Z. W., & Zeng, W. N. (2014). A multiple mediator model: Power analysis based on Monte Carlo simulation. *American Journal of Applied Psychology, 3*(3), 72-79. https://doi.org/10.11648/j.ajap.20140303.15
+
+
+# Sequential Multiple Assignment Randomized Trial (SMART)
+
+I started with a standard, simple 2-arm trial design as they are 
+easier to follow and understand. However, many of the real benefits 
+of Monte Carlo studies for power come for more complex designs.
+
+Next we will consider a new(er) trial design: 
+Sequential Multiple Assignment Randomized Trials (SMARTs).
+SMARTs involve more than one point of re-randomization. 
+They are good for testing adaptive interventions.
+
+We will work with the SMART shown in Figure 6[^SMARTs]. 
+
+[^SMARTs]: Note that Figure 6 is just one example of a SMART. The 
+core of a SMART is the sequential, multiple random assignment. 
+However, not all arms must be re-randomized. There is no requirement
+they start with only two arms. They do not need to rely on any measure 
+to re-randomize. For example after one month, everyone could be 
+re-randomized regardless of their response so far. If re-randomization 
+is based on some adaptive measure, it does not need to be the outcome.
+Re-randomization could be based on level of adherence to the Stage 1 
+intervention or any other factor of interest. The possibilities are 
+many. This talk is short. To see more examples including papers and code, 
+https://d3lab.isr.umich.edu/resources/ is a wonderful resource.
+
+
+```{r, echo = FALSE, fig.cap = "Figure 6. SMART Design."}
+
+DiagrammeR::grViz("
+digraph 'SMART DESIGN 2' {
+  graph [overlap = true, fontsize = 14]
+  node [fontname = Helvetica, shape = rectangle]
+  Light [label = 'Self Light']
+  LightR [label = 'Response']
+  LightNR [label = 'No Response']
+  LightStay  [label = '1. Continue Self Light']
+  LightPlus [label = '2. + Problem Solving & MI']
+  LightCBTI [label = '3. + CBT-I']
+
+  CBTI [label = 'Self CBT-I']
+  CBTIR [label = 'Response']
+  CBTINR [label = 'No Response']
+  CBTIStay [label = '4. Continue Self CBT-I']
+  CBTIPlus [label = '5. + Therapist CBT-I']
+  CBTILight [label = '6. + Light']
+  
+
+  node [fontname = Helvetica, shape = circle]
+  R [label = 'R\n1:1']
+  RLight [label = 'R\n1:1']
+  RCBTI [label = 'R\n1:1']
+
+  R -> {Light CBTI}
+
+  Light -> {LightR LightNR}
+  LightR -> LightStay
+  LightNR -> RLight
+  RLight -> {LightPlus LightCBTI}
+
+  CBTI -> {CBTIR CBTINR}
+  CBTIR -> CBTIStay
+  CBTINR -> RCBTI
+  RCBTI -> {CBTIPlus CBTILight}
+}
+")
+
+```
+
+This trial essentially is comparing use of light therapy or CBT-I.
+However, in both cases, the interventions are adaptive. 
+A baseline ISI measure is taken. Then participants are randomized 1:1 to 
+a self-help based intervention for one month. After one month of self-help
+intervention, a midpoint ISI assessment is collected and used to characterize 
+people as those who had a response (4 point or greater decline in ISI[^RESPONSE]) 
+and those who had no response (less than 4 point decline or any increase in ISI).
+If people had a response after one month to the self-help intervention 
+they were randomized to, they continue with that self-help intervention for 
+another month. If they did not have a response, then they are re-randomized 
+1:1 to either an augmented version of the same intervention 
+(adding problem solving and motivational interviewing to the self-help light or 
+therapist delivered CBT-I) or to a self-help version of whichever intervention
+they were not randomized at Stage 1. That is, people randomized initially to 
+light then get self-help CBT-I. Those initially randomized to self-help CBT-I
+then get self-help light. The second stage intervention continues for another 
+month at which point the post intervention ISI is assessed, which serves as the 
+primary outcome and primary endpoint.
+
+[^RESPONSE]: A 4 point change in the ISI is not an established minimally 
+important difference. I am just using 4 points for the sake of example.
+In order to create adaptive interventions, it is, however, very helpful 
+to have established minimally important differences or clinically 
+important differences. This is an area where more research is needed.
+If you do any, please share it with me, I'd love to know more MIDs for 
+sleep. There is one paper, that concluded a 6 point difference was clinically 
+meaningful. This is about a 1.5 standard deviation change, which is quite 
+large. **Reference** </br>
+Yang, M., Morin, C. M., Schaefer, K., & Wallenstein, G. V. (2009). 
+Interpreting score differences in the Insomnia Severity Index: 
+using health-related outcomes to define the minimally important difference. 
+*Current Medical Research and Opinion, 25*(10), 2487-2494.
+
+
+This SMART follows a fairly typical, stepped care-type model. Non responders 
+get a more potent dose. However, it can answer multiple research questions, 
+such as:
+
+*  Given the second stage interventions, do people randomized to self-help 
+   light or CBT-I have better outcomes?
+*  If people do not respond to their Stage 1 intervention, is it better to 
+   intensify / offer more support for the same type of intervention or add 
+   a self-help but different intervention?
+*  More specifically, is the adaptive intervention that starts with self-help 
+   CBT-I and continues with that for responders but offers therapist-delivered 
+   CBT-I to non-responders superior to the adaptive intervention that 
+   starts with self-help CBT-I and continues with that for responders but offers 
+   self-help light to non-responders?
+   
+More questions can be answered, these are just examples. SMARTs are nice in that 
+they can allow multiple questions to be addressed in a single trial. They are 
+especially good for evaluating adaptive interventions.
+
+It also would be a challenge to find any fixed software to calculate accurate 
+power estimates for, even if the outcome were continuous, normally distributed, 
+and at a single time point, let alone if the entire SMART were happening in the 
+context of clusters, had a repeated measures endpoint, or a survival endpoint.
+
+If using a SMART in a proposal/grant, it will likely be helpful to include some 
+general description and very clear write up as many reviewers may not be 
+familiar with them or have only limited knowledge. Plan to keep extra space in 
+your proposal for this purpose.
+
+The next sections show how to analyze this SMART and how to conduct a 
+Monte Carlo study to derive power estimates.
+
+## Analysis
+
+One of the primary papers (perhaps the primary paper) on how to analyze SMARTs is:
+
+Nahum-Shani, I., Qian, M., Almirall, D., Pelham, W. E., Gnagy, B., Fabiano, G. A., Waxmonsky, J. G., Yu, J., & Murphy, S. A. (2012). Experimental design and primary data analysis methods for comparing adaptive interventions. *Psychological Methods, 17*(4), 457–477. https://doi.org/10.1037/a0029372
+
+This is strongly recommended reading for anyone proposing or analyzing their own SMART.
+
+
+```{r, include = FALSE}
+## this code is not included in the HTML
+## you do not need to run this code, but I included it
+## so you can see how the initial sample data set for SMART analysis
+## was created
+
+## CBT-I parameters
+paramsCBTI <- data.table(
+  ## number of people allocated to CBT-I
+  N = 120L,
+  ## mean ISI at baseline in CBT-I group
+  baseintercept = 16,
+  ## SD of ISI at baseline in CBT-I group
+  baseSD = 3,
+  ## how much the mean declines from baseline, on average
+  ## to the mid assessment when response / no response is measured
+  response  = -3,
+  ## formula to give same SD as baseline given the baseline SD and
+  ## the stability in construct over time
+  responseSD = sqrt(9 - 3^2 * .5^2),
+  ## how much decline in ISI from baseline to midpoint is considered
+  ## a response? 
+  responseCutoff <- -4,
+  ## allocation ratio for stage 2 randomization
+  ratio2 = .5,
+  ## how much decline in intercept from midpoint to post in those with no response (R0)
+  postresponseR0 = -2,
+  ## how much decline in intercept from midpoint to post in those with a response (R1)
+  postresponseR1 = -1,
+  ## how different are the two stage 2 intervention conditions?
+  stage2 = -1,
+  ## formula for SD of post ISI in those with no response (R0)
+  postSDR0 = sqrt(9 - (3^2 * .5^2) - (.5^2 * (-1)^2)),
+  ## formula for SD of post ISI in those with a response (R1)
+  postSDR1 = sqrt(9 - (3^2 * .5^2)),
+  ## this one stability estimate is used for baseline to mid and for mid to post.
+  stability = .5)
+
+## Light Parameters
+paramsLIGHT <- paramsCBTI
+paramsLIGHT$response <- -2
+paramsLIGHT$postresponseR0 <- -1
+paramsLIGHT$postresponseR1 <- 0
+paramsLIGHT$stage2 <- -2
+paramsLIGHT$postSDR0 = sqrt(9 - (3^2 * .5^2) - (.5^2 * (-2)^2))
+
+
+set.seed(1234)
+x <- rnorm(paramsCBTI$N,
+           mean = paramsCBTI$baseintercept,
+           sd = paramsCBTI$baseSD)
+z <- rnorm(paramsCBTI$N,
+           mean = paramsCBTI$baseintercept * paramsCBTI$stability +
+             paramsCBTI$response + paramsCBTI$stability * x,
+           sd = paramsCBTI$responseSD)
+## change from baseline to after 1 month of self-help
+delta <- z - x
+## if someone declines by 4 or more points, they responded (1), else no response (0)
+r <- fifelse(delta < -4, 1L, 0L)
+
+## stage 2 randomization
+stage2 <- sample(rep(0L:1L, each = paramsCBTI$N * paramsCBTI$ratio2))
+
+## only select it for those who did not repond (R0)
+stage20 <- stage2[r == 0]
+
+## midpoint scores for those with no response (R0)
+z0 <- z[r == 0]
+
+## midpoint scores for those with a response (R1)
+z1 <- z[r == 1]
+
+## average midpoint score for those with no response (R0)
+zmeanR0 <- mean(z0)
+
+## average midpoint score for those with a response (R1)
+zmeanR1 <- mean(z1)
+
+## post ISI for those with no response (R0)
+y0 <- rnorm(sum(r == 0),
+           mean = zmeanR0 * paramsCBTI$stability +
+             paramsCBTI$postresponseR0 + paramsCBTI$stability * z0 +
+             paramsCBTI$stage2 * stage20,
+           sd = paramsCBTI$postSDR0)
+
+## post ISI for those with a response (R1)
+y1 <- rnorm(sum(r == 1),
+           mean = zmeanR1 * paramsCBTI$stability +
+             paramsCBTI$postresponseR1 + paramsCBTI$stability * z1,
+           sd = paramsCBTI$postSDR1)
+
+## put everything together
+smartdataCBTI <- data.table(
+  ID = order(r),
+  BaselineISI = c(x[r == 0], x[r == 1]),
+  MidpointISI = c(z0, z1),
+  PostISI = c(y0, y1),
+  Response = sort(r),
+  Stage1 = "CBT-I",
+  Stage2 = c(stage20, rep(NA_integer_, sum(r == 1))))[order(ID)]
+
+## make light dataset
+x <- rnorm(paramsLIGHT$N,
+           mean = paramsLIGHT$baseintercept,
+           sd = paramsLIGHT$baseSD)
+z <- rnorm(paramsLIGHT$N,
+           mean = paramsLIGHT$baseintercept * paramsLIGHT$stability +
+             paramsLIGHT$response + paramsLIGHT$stability * x,
+           sd = paramsLIGHT$responseSD)
+## change from baseline to after 1 month of self-help
+delta <- z - x
+## if someone declines by 4 or more points, they responded (1), else no response (0)
+r <- fifelse(delta < -4, 1L, 0L)
+
+## stage 2 randomization
+stage2 <- sample(rep(0L:1L, each = paramsLIGHT$N * paramsLIGHT$ratio2))
+
+## only select it for those who did not repond (R0)
+stage20 <- stage2[r == 0]
+
+## midpoint scores for those with no response (R0)
+z0 <- z[r == 0]
+
+## midpoint scores for those with a response (R1)
+z1 <- z[r == 1]
+
+## average midpoint score for those with no response (R0)
+zmeanR0 <- mean(z0)
+
+## average midpoint score for those with a response (R1)
+zmeanR1 <- mean(z1)
+
+## post ISI for those with no response (R0)
+y0 <- rnorm(sum(r == 0),
+           mean = zmeanR0 * paramsLIGHT$stability +
+             paramsLIGHT$postresponseR0 + paramsLIGHT$stability * z0 +
+             paramsLIGHT$stage2 * stage20,
+           sd = paramsLIGHT$postSDR0)
+
+## post ISI for those with a response (R1)
+y1 <- rnorm(sum(r == 1),
+           mean = zmeanR1 * paramsLIGHT$stability +
+             paramsLIGHT$postresponseR1 + paramsLIGHT$stability * z1,
+           sd = paramsLIGHT$postSDR1)
+
+## put everything together
+smartdataLIGHT <- data.table(
+  ID = order(r),
+  BaselineISI = c(x[r == 0], x[r == 1]),
+  MidpointISI = c(z0, z1),
+  PostISI = c(y0, y1),
+  Response = sort(r),
+  Stage1 = "Light",
+  Stage2 = c(stage20, rep(NA_integer_, sum(r == 1))))[order(ID)]
+
+smartdata <- rbind(smartdataLIGHT, smartdataCBTI)
+smartdata[, ID := sample(1:nrow(smartdata))]
+smartdata <- smartdata[order(ID)]
+
+smartdata
+
+## now give the conditions at stages 1 & 2 some nicer names
+smartdata[, Stage1 := factor(Stage1, levels = c("Light", "CBT-I"),
+                           labels = c("Light", "CBT-I"))]
+smartdata[, Stage2 := factor(Stage2, levels = 0:1,
+                           labels = c("Higher Intensity", "Both Interventions"))]
+
+saveRDS(smartdata, file = "smartdata.RDS", compress = "xz")
+
+``` 
+
+An example dataset for the SMART is available from the GitHub repo. 
+After reading the dataset in, let's look at the first few rows, shown in Table 4.
+Notice that ID 1 responded to the Stage 1 intervention, so are missing (NA) 
+the Stage 2 intervention.
+
+```{r, results = 'asis'}
+
+smartdata <- readRDS("smartdata.RDS")
+
+knitr::kable(head(smartdata), caption = "Table 4. The first 6 rows of the sample dataset for the SMART.")
+
+```
+
+Table 5 shows basic descriptive statistics by the first stage intervention.
+Perhaps most relevant is the response rates. 25% of people responded to 
+self-help light and 28.3% responded to self-help CBT-I. The response rate is 
+critical in this SMART because it determines how many people go on to Stage 2 
+randomization. Research questions that are focused on the second stage will be 
+be influenced by the number of people who have no response to the Stage 1 
+intervention (note no response here means not meeting our predefined cut off 
+of 4 point ISI decline). Note the simple bivariate tests and effect sizes are 
+not of particular focus, but are given by default.
+
+```{r, results = 'asis'}
+
+knitr::kable(
+  egltable(
+    vars = c("BaselineISI", "MidpointISI", "PostISI", "Response"),
+    g = "Stage1",
+    data = smartdata,
+    strict = FALSE),
+  caption = "Table 5. Basic descriptive statistics by first stage intervention.")
+
+```
+
+One way to evaluate the Stage 1 intervention main effects in the context of 
+the Stage 2 interventions simply is to ignore Stage 2. These results are in 
+Table 6. People randomized to self-help CBT-I do a little better in the sample, 
+although this is not statistically significant.
+
+```{r, results = 'asis'}
+
+m1.smart <- lm(PostISI ~ Stage1 + BaselineISI, data = smartdata)
+
+knitr::kable(
+  APAStyler(modelTest(m1.smart)),
+  caption = "Table 6. Effect of Stage 1 intervention.")
+
+```
+
+Comparing the adaptive interventions requires a few more issues to be addressed.
+First, participants do not have equal probability of being allocated to 
+each group as people who do not respond are subsequently allocated to one of two 
+groups. This can be solved to achieve balance by weighting the data.
+People who respond have a .50 probability whereas people who do not respond have a .50 * .50 or .25 probability. We use the inverse (i.e., $\frac{1}{.5} = 2$ and $\frac{1}{.25} = 4$) as weights in the data and will use these weights in any analysis.
+
+```{r}
+
+## weights
+smartdata[, weight := fifelse(Response == 1L, 2L, 4L)]
+
+```
+
+Second, if we want one analysis to compare all adaptive interventions, we 
+need to count responders into each adaptive intervention. 
+We can do this easily in existing regression software by duplicating 
+the observations for responders and assigning each responder to both 
+of the Stage 2 interventions. The resulting dataset now has repeated 
+observations for some participants, which we address using clustered 
+standard errors using generalized estimating equations (GEEs[^GEEs]).
+This follows the approach from Nahum-Shani and colleagues (2012).
+The newly created "smartdataall" dataset has both weights and responders 
+observations doubled. Note this has increased the number of observations.
+
+[^GEEs]: A good reference for GEEs is: </br>
+Halekoh, U., Højsgaard, S., Yan, J. (2006) The R Package geepack for
+Generalized Estimating Equations. *Journal of Statistical Software*.
+https://www.jstatsoft.org/article/view/v015i02
+
+
+```{r} 
+
+## duplicate observations for responders
+d11 <- smartdata[Response == 1]
+d11[, ob := 1L]
+d11[, Stage2 := "Higher Intensity"]
+
+d12 <- smartdata[Response == 1]
+d12[, ob := 2L]
+d12[, Stage2 := "Both Interventions"]
+
+## no duplicates for non responders
+d0 <- smartdata[Response == 0]
+d0[, ob := 1L]
+
+smartdataall <- rbind(d0, d11, d12)[order(ID)]
+
+dim(smartdataall)
+
+```
+
+Now we use a GEE with an interaction between Stage 1 and Stage 2, 
+controlling for baseline ISI. Weights and cluster standard errors 
+by ID are used. Of importance in the output, we can see there were 
+240 clusters, which was the original sample size and that the maximum 
+cluster size is 2, which is what it should be since we only duplicated
+responders once.
+
+```{r}
+
+m2.smart <- geeglm(PostISI ~ Stage1 * Stage2 + BaselineISI,
+                   data = smartdataall, weights = weight, id = ID)
+
+summary(m2.smart)
+
+``` 
+
+Our main results will focus on the adaptive intervention, adjusted 
+mean ISI values at post intervention and their comparisons.
+We use the `emmeans()` function to get estimated means.
+These are based on the model, which is properly weighted and clustered
+so these results take everything into account. It is worth noting 
+how to interpret each adaptive intervention mean.
+
+*  **Light - Higher Intensity**: this is the adaptive intervention 
+   where people start with self-help light for one month. 
+   If they respond, they continue with self-help light. If they do 
+   not respond, they are given higher intensity (i.e., problem solving + 
+   motivational interviewing to support regular light use). The `emmean` 
+   is the estimated average ISI at post intervention for people given that 
+   entire adaptive intervention program.
+*  **CBT-I - Higher Intensity**: this is the adaptive intervention 
+   where people start with self-help CBT-I for one month. 
+   If they respond, they continue with self-help CBT-I. If they do 
+   not respond, they are given higher intensity (i.e., therapist-delivered 
+   CBT-I). The `emmean` is the estimated average ISI at post intervention 
+   for people given that entire adaptive intervention program.
+*  **Light - Both Interventions**: this is the adaptive intervention 
+   where people start with self-help light for one month. 
+   If they respond, they continue with self-help light. If they do 
+   not respond, they are given self-help CBT-I for one month in addition 
+   to the self-help light. The `emmean` 
+   is the estimated average ISI at post intervention for people given that 
+   entire adaptive intervention program.
+*  **CBT-I - Both Interventions**: this is the adaptive intervention 
+   where people start with self-help CBT-I for one month. 
+   If they respond, they continue with self-help CBT-I. If they do 
+   not respond, they are given self-help light for one month in addition 
+   to the self-help CBT-I. The `emmean` 
+   is the estimated average ISI at post intervention for people given that 
+   entire adaptive intervention program.
+   
+The key here is that these are adaptive interventions. It is not just the 
+people who had a response or who had no response. It is the average 
+outcome of the entire adaptive intervention program. 
+The means and 95% confidence intervals are in Table 7.
+
+```{r, results = 'asis'}
+
+em2.smart <- emmeans(m2.smart, ~ Stage1 + Stage2)
+
+knitr::kable(
+  confint(em2.smart),
+  caption = "Table 7. Estimated post intervention ISI for each adaptive intervention.")
+
+```
+
+Finally, we could ask whether one specific adaptive intervention program 
+yields superior results to another. With four adaptive intervention programs 
+tested in the SMART, there are 6 unique pairwise comparisons.
+We use the `pairs()` function to get pairwise comparisons on the estimated means 
+saved in `em2.smart` and then use the `confint()` function to get confidence 
+intervals. If we changed `confint()` to `summary()` we could get p-values.
+A Tukey adjustment for multiple comparisons is made. The results are in Table 8.
+
+```{r, results = 'asis'}
+
+knitr::kable(
+  confint(pairs(em2.smart)),
+  caption = "Table 8. Estimated pairwise differences and confidence intervals.")
+
+``` 
+
+The results in Table 8 show that the two programs that start with 
+self-help CBT-I are not very different (.279) nor are interventions that 
+start with self-help CBT-I different from those that start with light and 
+adapt with self-help CBT-I. However, starting with self-help light and 
+offering further support to engage and regularly use the light results in 1.4 to 1.7 
+point higher ISI at post intervention than any of the other adaptive intervention 
+programs. These confidence intervals have been adjusted based for multiple comparisons 
+so are wider than unadjusted confidence intervals would be.
+
+
+## Power Analysis 
+
+For a power analysis, we could be focused on any one comparison or all of them.
+A Monte Carlo study will allow us to examine any or all of these contrasts 
+evaluated in our analyses. In addition, we have the choice of whether we would 
+want to power the study for unadjusted results or results adjusted for 
+multiple comparisons.
+
+For the sake of example, suppose that although all comparisons will be evaluated, 
+the primary aim of the grant is to evaluate whether an adaptive intervention 
+starting with self-help CBT-I and adding therapist delivery if no response is superior 
+to starting with self-help light and adding support if no response. Therefore we 
+will use an unadjusted result as we only have one main hypothesized contrast of interest.
+
+The Monte Carlo study follows the same approach as for a standard RCT. 
+However, the SMART is more complex with more layers and more groups, so we 
+must specify many more parameters. Monte Carlo studies can quickly become 
+long. However, each piece often is not much more complicated. At every step
+we specify the expected probability distribution for each variable / measure 
+and estimates for the parameters that feed into it.
+
+The following code is rather long but each piece is fairly straight forward. 
+Some parameters are fixed. With this many parameters if we tried 2-3 options for 
+each, we would have thousands of different combinations and it would become 
+computationally intractable. Here I fixed several parameters and focused on varying 
+four of them:
+
+*  The sample size (this is always needed) from 100 to 1000 by 20.
+*  The baseline standard deviation of ISI. Actually since I use the same SD at mid and post, this equates to varying the amount of variability in ISI with a SD of 3 and of 4.
+*  How much people in the self-help CBT-I condition who show no response decline 
+   from midpoint to post when given therapist-delivered CBT-I: 2 or 1 point additional 
+   decline.
+*  How different people who did not respond to self-help CBT-I are at post if given 
+   self-help light (both interventions) versus therapist-delivered CBT-I: 1 point or 
+   0 points better.
+   
+   
+This gives 2 x 2 x 2 = 8 different parameter conditions excluding sample size, 
+and 368 conditions when including the different sample sizes I am exploring.
+Each of those 368 conditions is simulated 200 times with different random 
+numbers, resulting in 73,600 datasets and analyses being run. On my machine 
+using 24 CPU cores, this took about 6 minutes. Again time should scale about 
+linearly so if run on 1 CPU core, expect it to take about 2.5 hours. 
+
+```{r}
+
+## CBT-I and Light parameters
+params <- as.data.table(expand.grid(
+  ## number of people
+  N = seq(from = 100, to = 1000, by = 20),
+  ## ratio for first randomization
+  ratio1 = .5,
+  ## mean ISI at baseline 
+  baseintercept = 16,
+  ## SD of ISI at baseline
+  baseSD = c(3, 4),
+  ## how much decline in ISI from baseline to midpoint is considered
+  ## a response? 
+  responseCutoff = -4,
+  ## allocation ratio for stage 2 randomization
+  ratio2 = .5,
+  ## this one stability estimate is used for baseline to mid and for mid to post.
+  stability = .5,
+  
+  ## how much the mean declines from baseline, on average
+  ## to the mid assessment when response / no response is measured
+  CBTIresponse = c(-3),
+  ## how much decline in intercept from midpoint to post in those with no response (R0)
+  CBTIpostresponseR0 = c(-2, -1),
+  ## how much decline in intercept from midpoint to post in those with a response (R1)
+  CBTIpostresponseR1 = -1,
+  ## how different are the two stage 2 intervention conditions?
+  CBTIstage2 = c(-1, 0),
+
+  ## how much the mean declines from baseline, on average
+  ## to the mid assessment when response / no response is measured
+  LIGHTresponse  = c(-2),
+  ## how much decline in intercept from midpoint to post in those with no response (R0)
+  LIGHTpostresponseR0 = c(-1),
+  ## how much decline in intercept from midpoint to post in those with a response (R1)
+  LIGHTpostresponseR1 = c(0),
+  ## how different are the two stage 2 intervention conditions?
+  LIGHTstage2 = -2
+))
+
+## formula to give same SD as baseline given the baseline SD and
+## the stability in construct over time
+params[, responseSD := sqrt(baseSD^2 - (baseSD^2 * stability^2))]
+
+## formula for post SD in responders
+params[, postSDR1 := sqrt(baseSD^2 - (baseSD^2 * stability^2))]
+
+## formula for SD of post ISI in those with no response (R0)
+params[, CBTIpostSDR0 := sqrt(baseSD^2 - (baseSD^2 * stability^2) -
+                               (.5^2 * (CBTIstage2)^2))]
+
+## formula for SD of post ISI in those with no response (R0)
+params[, LIGHTpostSDR0 := sqrt(baseSD^2 - (baseSD^2 * stability^2) -
+                                 (.5^2 * (LIGHTstage2)^2))]
+
+## number of combinations of parameters and N
+nrow(params)
+
+## decide how many replicates for each condition, we do 200
+params <- do.call(rbind, rep(list(params), 200))
+params[, run := 1L:nrow(params)]
+
+if (FALSE) {
+## create a local cluster using 24 cores
+## if your computer does not have 24 or more cores
+## set this number to the number of cores you have
+cl <- makeCluster(24L)
+
+invisible(clusterEvalQ(cl, {
+  library(data.table)
+  library(emmeans)
+  library(geepack)
+}))
+
+clusterExport(cl, "params")
+
+registerDoParallel(cl)
+
+set.seed(1234)
+montecarloResults <- do.call(rbind, foreach(i = 1:nrow(params), .combine = c) %dorng% {
+
+x <- rnorm(params$N[i] * params$ratio1[i],
+           mean = params$baseintercept[i],
+           sd = params$baseSD[i])
+z <- rnorm(params$N[i] * params$ratio1[i],
+           mean = params$baseintercept[i] * params$stability[i] +
+             params$CBTIresponse[i] + params$stability[i] * x,
+           sd = params$responseSD[i])
+## change from baseline to after 1 month of self-help
+delta <- z - x
+## if someone declines by 4 or more points, they responded (1), else no response (0)
+r <- fifelse(delta < params$responseCutoff[i], 1L, 0L)
+
+## stage 2 randomization
+stage2 <- sample(rep(0L:1L, each = params$N[i] * params$ratio1[i] * params$ratio2[i]))
+
+## only select it for those who did not repond (R0)
+stage20 <- stage2[r == 0]
+
+## midpoint scores for those with no response (R0)
+z0 <- z[r == 0]
+
+## midpoint scores for those with a response (R1)
+z1 <- z[r == 1]
+
+## average midpoint score for those with no response (R0)
+zmeanR0 <- mean(z0)
+
+## average midpoint score for those with a response (R1)
+zmeanR1 <- mean(z1)
+
+## post ISI for those with no response (R0)
+y0 <- rnorm(sum(r == 0),
+           mean = zmeanR0 * params$stability[i] +
+             params$CBTIpostresponseR0[i] + params$stability[i] * z0 +
+             params$CBTIstage2[i] * stage20,
+           sd = params$CBTIpostSDR0[i])
+
+## post ISI for those with a response (R1)
+y1 <- rnorm(sum(r == 1),
+           mean = zmeanR1 * params$stability[i] +
+             params$CBTIpostresponseR1[i] + params$stability[i] * z1,
+           sd = params$postSDR1[i])
+
+## put everything together
+smartdataCBTI <- data.table(
+  ID = order(r),
+  BaselineISI = c(x[r == 0], x[r == 1]),
+  MidpointISI = c(z0, z1),
+  PostISI = c(y0, y1),
+  Response = sort(r),
+  Stage1 = "CBT-I",
+  Stage2 = c(stage20, rep(NA_integer_, sum(r == 1))))[order(ID)]
+
+## make light dataset
+x <- rnorm(params$N[i] * params$ratio1[i],
+           mean = params$baseintercept[i],
+           sd = params$baseSD[i])
+z <- rnorm(params$N[i] * params$ratio1[i],
+           mean = params$baseintercept[i] * params$stability[i] +
+             params$LIGHTresponse[i] + params$stability[i] * x,
+           sd = params$responseSD[i])
+
+## change from baseline to after 1 month of self-help
+delta <- z - x
+## if someone declines by 4 or more points, they responded (1), else no response (0)
+r <- fifelse(delta < params$responseCutoff[i], 1L, 0L)
+
+## stage 2 randomization
+stage2 <- sample(rep(0L:1L, each = params$N[i] * params$ratio1[i] * params$ratio2[i]))
+
+## only select it for those who did not repond (R0)
+stage20 <- stage2[r == 0]
+
+## midpoint scores for those with no response (R0)
+z0 <- z[r == 0]
+
+## midpoint scores for those with a response (R1)
+z1 <- z[r == 1]
+
+## average midpoint score for those with no response (R0)
+zmeanR0 <- mean(z0)
+
+## average midpoint score for those with a response (R1)
+zmeanR1 <- mean(z1)
+
+## post ISI for those with no response (R0)
+y0 <- rnorm(sum(r == 0),
+           mean = zmeanR0 * params$stability[i] +
+             params$LIGHTpostresponseR0[i] + params$stability[i] * z0 +
+             params$LIGHTstage2[i] * stage20,
+           sd = params$LIGHTpostSDR0[i])
+
+## post ISI for those with a response (R1)
+y1 <- rnorm(sum(r == 1),
+           mean = zmeanR1 * params$stability[i] +
+             params$LIGHTpostresponseR1[i] + params$stability[i] * z1,
+           sd = params$postSDR1[i])
+
+## put everything together
+smartdataLIGHT <- data.table(
+  ID = order(r),
+  BaselineISI = c(x[r == 0], x[r == 1]),
+  MidpointISI = c(z0, z1),
+  PostISI = c(y0, y1),
+  Response = sort(r),
+  Stage1 = "Light",
+  Stage2 = c(stage20, rep(NA_integer_, sum(r == 1))))[order(ID)]
+
+smartdata <- rbind(smartdataLIGHT, smartdataCBTI)
+smartdata[, ID := sample(1:nrow(smartdata))]
+smartdata <- smartdata[order(ID)]
+
+## now give the conditions at stages 1 & 2 some nicer names
+smartdata[, Stage1 := factor(Stage1, levels = c("Light", "CBT-I"),
+                           labels = c("Light", "CBT-I"))]
+smartdata[, Stage2 := factor(Stage2, levels = 0:1,
+                           labels = c("Higher Intensity", "Both Interventions"))]
+
+## weights
+smartdata[, weight := fifelse(Response == 1L, 2L, 4L)]
+
+## duplicate observations for responders
+d11 <- smartdata[Response == 1]
+d11[, ob := 1L]
+d11[, Stage2 := "Higher Intensity"]
+
+d12 <- smartdata[Response == 1]
+d12[, ob := 2L]
+d12[, Stage2 := "Both Interventions"]
+
+## no duplicates for non responders
+d0 <- smartdata[Response == 0]
+d0[, ob := 1L]
+
+smartdataall <- rbind(d0, d11, d12)[order(ID)]
+
+m1.smart <- lm(PostISI ~ Stage1 + BaselineISI, data = smartdata)
+
+p.stage1 <- coef(summary(m1.smart))[2, "Pr(>|t|)"]
+
+m2.smart <- geeglm(PostISI ~ Stage1 * Stage2 + BaselineISI,
+                   data = smartdataall, weights = weight, id = ID)
+
+em2.smart <- emmeans(m2.smart, ~ Stage1 + Stage2)
+ep2.smart <- as.data.table(summary(pairs(em2.smart, adjust = "none")))
+
+list(data.table(
+  run = i,
+  Stage1 = p.stage1,
+  Contrast1 = ep2.smart[1, p.value],
+  Contrast2 = ep2.smart[2, p.value],
+  Contrast3 = ep2.smart[3, p.value],
+  Contrast4 = ep2.smart[4, p.value],
+  Contrast5 = ep2.smart[5, p.value],  
+  Contrast6 = ep2.smart[6, p.value]))
+})
+
+smartMonteCarloResults <- merge(params,
+                          montecarloResults,
+                          by = "run")
+  
+saveRDS(smartMonteCarloResults, file = "smartMonteCarloResults_power.RDS",
+        compress = "xz")
+}
+
+``` 
+
+As before, I saved the resulting p-values into a data file that can be read 
+in and analyzed, so you do not need to run this to follow the results.
+Download the file from GitHub if desired.
+
+A graph of power for the first contrast, which contrasts the Light - Higher Intensity adaptive intervention program to the CBT-I - Higher Intensity adaptive intervention program is graphed by all the parameters we varied in Figure 7. The different line colors/types 
+show either an additional 2 or 1 point decline in ISI for the therapist-delivered CBT-I 
+condition from midpoint to post. The columns show an ISI standard deviation of 3 or 4.
+The rows show how different adding light to self-help CBT-I is compared to adding 
+therapist-delivered CBT-I. Unsurprisingly, this has little impact on the power.
+
+```{r, fig.width = 9, fig.height = 9, fig.cap = "Figure 7. Power Results from Monte Carlo Study for SMART.", fig.fullwidth = TRUE}
+
+## read in the monte carlo results (can download from GitHub)
+smartMonteCarloResults <- readRDS("smartMonteCarloResults_power.RDS")
+
+ggplot(smartMonteCarloResults,
+       aes(N, as.numeric(Contrast1 < .05),
+           colour = factor(CBTIpostresponseR0),
+           linetype = factor(CBTIpostresponseR0))) +
+  scale_y_continuous("Power", labels = percent) +
+  geom_hline(yintercept = 0.80) +
+  geom_vline(xintercept = 500) +
+  scale_color_viridis_d() +   
+  stat_smooth(method = "loess", se = FALSE, formula = y ~ x, size = 1.5) +
+  facet_grid(CBTIstage2 ~ baseSD, scales = "free") +
+  theme_pubr()
+
+``` 
+
+Figure 8 shows us that to have 80% power for our primary contrast of interest 
+across the conditions evaluated takes about 500 participants.
+As always, the key here is for the conditions evaluated. The assumptions we 
+made when choosing the parameters to fix and the ones to vary and even if we 
+varied a parameter, what values to explore for variation matter. For example, 
+if the true ISI standard deviation ends up being 6, we will end up under powered.
+
+
+## Monte Carlo Power Example
+
+Here is an example of some of the write-up from one of my RCTs that is just starting.
+In particular, the last sentence shows a way of succinctly trying to convey complex 
+results from a variety of conditions.
+
+
+> Insomnia severity index: We created all possible combinations of the following factors, resulting in a total of 24 different conditions:
+> 
+> *  residual variance: SleepWell, SleepWell + 10%
+> these two values were used as we anticipate results being similar to SleepWell, yet recognise that with the addition of another site, somewhat more heterogeneity may be added, captured by a 10% increase
+> *  random intercept variance: SleepWell, SleepWell + 10%
+> these two values were used as we anticipate results being similar to SleepWell, yet recognise that with the addition of another site, more heterogeneity may be added, particularly between individuals, captured by a 10% increase
+> *  Simple effect of BLT: -3, beyond control, the minimally important difference selected for the insomnia severity index.
+> *  Simple effect of CBT: -3 and -4, beyond control. -3 is the minimally important difference selected for the insomnia severity index, and -4 is a slightly larger, but plausible effect given previous trials. No larger effects were tested for BLT as we expect BLT to have relatively weaker effects than CBT on insomnia severity index.
+> *  Interaction of BLT x CBT: -3, +0, and +3. These correspond to no interaction (what is expected given that CBT and BLT operate of very different mechanisms), the minimally important difference either as a diminishing returns of combining BLT and CBT (+3) and as augmenting returns from combining the interventions (-3).
+> 
+> For both insomnia severity symptoms and fatigue symptoms, sample sizes were varied from 100 to 300 in increments of 10 for each of the 24 different conditions. Each time, 500 simulations were conducted and analysed. The proportion of times a parameter was significant at the alpha = .05 level was calculated and used as an empirical power estimate. We focused on three estimates of interest for the power analysis. First, the main effect of BLT, calculated incorporating both the simple effect and the interaction effect. Second, the main effect of CBT, calculated incorporating both the simple effect and the interaction effect. Third, the interaction of BLT x CBT. Only the main effects are primary aims of the SleepCare Trial. The interaction effect is an exploratory aim as we do not expect to have a sufficient sample size to detect a significant interaction, as the effect is likely small. Empirical results were graphed using locally weighted regression smoothers to smooth out variation due to sampling variability and discrete sample sizes (increments of 10 rather than continuous sample size increments). Results are shown in graphs on the following pages.
+> 
+> Results of the power analyses revealed that randomising 210 women will provide >80% power to detect main effects of CBT and BLT on ISI and Fatigue under most assumptions with α = 0.05.
+> 
