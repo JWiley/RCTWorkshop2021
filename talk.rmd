@@ -69,8 +69,7 @@ an upgraded GitHub account for free. If you're in academia, its a great option.
 
 Here is an example from my group using GitHub for the planning of a 
 clinical trial: 
-[https://github.com/behavioralmedicinelab/SleepCarePlanning/]
-(https://github.com/behavioralmedicinelab/SleepCarePlanning/).
+https://github.com/behavioralmedicinelab/SleepCarePlanning/.
 
 *The next two tools are only needed if you want to use or follow along 
 with my examples for power analysis and statistical analysis.*
@@ -444,8 +443,8 @@ Enders, C. K. (2010). *Applied missing data analysis*. Guilford press. (this is 
 Little, T. D., Lang, K. M., Wu, W., & Rhemtulla, M. (2016). Missing data. *Developmental psychopathology*, 1-37.</br>
 
 A very nice Statistical Analysis Plan for a large trial in sleep is from the 
-SAVE study. The SAP can be accessed here:
-https://journals.sagepub.com/doi/suppl/10.1177/1747493015607504/suppl_file/SAVE_SAP_v1_10July2015.pdf
+SAVE study. The SAP can be accessed 
+[here](https://journals.sagepub.com/doi/suppl/10.1177/1747493015607504/suppl_file/SAVE_SAP_v1_10July2015.pdf).
 
 Finally, there are no specific references for further reading on clinical trial statistics because the statistics used and required vary greatly. For example, they will differ by the assumed (or not) distribution of the outcome, whether the endpoint is a single time point or change over time, whether there is any clustering, and many more factors. If you are not confident that you are choosing a reasonable or the best approach, I would encourage consulting a quantitative expert.
 
@@ -750,8 +749,12 @@ rm(cl)
 ``` 
 
 Although I show the code, I saved the results from the Monte Carlo study itself so 
-you can read the results in without re-running it. In terms of time, on my system,
-it took about 30 seconds to run. That is with 24 CPU cores. Its roughly linear scaling,
+you can read the results in without re-running it. 
+Data are available here:
+[http://joshuawiley.com/RCTWorkshop2021/basicMonteCarloResults_power.RDS](http://joshuawiley.com/RCTWorkshop2021/basicMonteCarloResults_power.RDS). 
+
+In terms of time, on my system, it took about 30 seconds to run. 
+That is with 24 CPU cores. Its roughly linear scaling,
 so if you ran it on 1 CPU core, it would take ~ 24x as long or around 12 minutes.
 
 Now we can graph the results, which are in Figure 5. The y axis is the power. The 
@@ -1143,7 +1146,9 @@ saveRDS(smartdata, file = "smartdata.RDS", compress = "xz")
 
 ``` 
 
-An example dataset for the SMART is available from the GitHub repo. 
+An example dataset for the SMART is available from the GitHub repo or here:
+[http://joshuawiley.com/RCTWorkshop2021/smartdata.RDS](http://joshuawiley.com/RCTWorkshop2021/smartdata.RDS). 
+
 After reading the dataset in, let's look at the first few rows, shown in Table 4.
 Notice that ID 1 responded to the Stage 1 intervention, so are missing (NA) 
 the Stage 2 intervention.
@@ -1631,7 +1636,9 @@ saveRDS(smartMonteCarloResults, file = "smartMonteCarloResults_power.RDS",
 
 As before, I saved the resulting p-values into a data file that can be read 
 in and analyzed, so you do not need to run this to follow the results.
-Download the file from GitHub if desired.
+Download the file from GitHub if desired or here:
+[http://joshuawiley.com/RCTWorkshop2021/smartMonteCarloResults_power.RDS](http://joshuawiley.com/RCTWorkshop2021/smartMonteCarloResults_power.RDS). 
+
 
 A graph of power for the first contrast, which contrasts the Light - Higher Intensity adaptive intervention program to the CBT-I - Higher Intensity adaptive intervention program is graphed by all the parameters we varied in Figure 7. The different line colors/types 
 show either an additional 2 or 1 point decline in ISI for the therapist-delivered CBT-I 
